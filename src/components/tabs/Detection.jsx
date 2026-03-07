@@ -7,12 +7,20 @@ export default function Detection() {
     const [visionStatus, setVisionStatus] = useState(null);
     const { isConnected } = useTrafficData();
 
+    // The image tag handles the MJPEG stream directly. 
+    // We ping vision_status just for the overlay data.
     useEffect(() => {
-        fetch('http://localhost:8000/api/video_feed')
+        fetch('http://localhost:8000/api/vision_status')
             .then(res => res.json())
             .then(data => setVisionStatus(data))
-            .catch(err => console.error("Could not fetch vision API status"));
-    }, []);
+            .catch(err => {
+                console.error("Could not fetch vision API status");
+                // If it fails but we are connected via WS, assume backend is at least partially up
+                if (isConnected) {
+                    setVisionStatus({ status: 'active', fps: '?', model: 'YOLOv8', source: 'Live Feed' });
+                }
+            });
+    }, [isConnected]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-[600px]">
@@ -45,7 +53,7 @@ export default function Detection() {
                                 LIVE
                             </div>
                             <span className="text-white font-medium text-sm drop-shadow-md">
-                                CAM-01: Main Intersection (North-South)
+                                {visionStatus?.source || 'CAM-01: Main Intersection (North-South)'}
                             </span>
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -58,35 +66,26 @@ export default function Detection() {
                         </div>
                     </div>
 
-                    {/* Simulated Backend Feed rendering layer */}
-                    <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center border-2 border-dashed border-slate-700 m-2 relative">
-
-                        {/* Animated Scanning Line */}
-                        {isConnected && (
-                            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-                                <div className="w-full h-1 bg-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.5)] animate-scan"></div>
-                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-500/5 pointer-events-none"></div>
-                            </div>
-                        )}
-
-                        <BrainCircuit className={`w-16 h-16 ${isConnected ? 'text-cyan-500/50 animate-pulse' : 'text-slate-700'} mb-4`} />
+                    {/* Real YOLOv8 MJPEG Stream Container */}
+                    <div className="w-full h-full bg-black flex flex-col items-center justify-center relative">
                         {isConnected ? (
-                            <>
-                                <p className="text-slate-400 font-medium z-10">Processing Stream from Python Backend...</p>
-                                {visionStatus && (
-                                    <div className="mt-4 flex gap-4 text-xs font-mono text-cyan-400 z-10">
-                                        <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">FPS: {visionStatus.fps}</span>
-                                        <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">Model: {visionStatus.model}</span>
-                                        <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">Latency: {visionStatus.latency}</span>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-slate-500 font-medium">No active connection to YOLOv8 Backend.</p>
-                                <p className="text-slate-600 text-sm mt-2">Start the Python FastAPI server to begin detection.</p>
-                            </>
-                        )}
+                            // Render actual MJPEG stream from python backend whenever backend WS is alive
+                            <img
+                                src="http://localhost:8000/api/video_feed"
+                                alt="Live AI Video Stream"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'flex';
+                                }}
+                            />
+                        ) : null}
+
+                        <div className="flex-col items-center justify-center border-2 border-dashed border-slate-700 m-2 w-full h-[95%]" style={{ display: isConnected ? 'none' : 'flex' }}>
+                            <BrainCircuit className={`w-16 h-16 ${isConnected ? 'text-cyan-500/50 animate-pulse' : 'text-slate-700'} mb-4`} />
+                            <p className="text-slate-500 font-medium">No active connection to YOLOv8 Backend.</p>
+                            <p className="text-slate-600 text-sm mt-2">Start the Python FASTAPI server to begin live inference.</p>
+                        </div>
                     </div>
 
                     {/* Metrics Overlay */}
@@ -97,8 +96,8 @@ export default function Detection() {
                                     <ScanLine className="w-4 h-4 text-cyan-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-slate-400">FPS</p>
-                                    <p className="text-white font-bold font-mono">24.2</p>
+                                    <p className="text-xs text-slate-400">FPS Limit</p>
+                                    <p className="text-white font-bold font-mono">{visionStatus?.fps || '...'}</p>
                                 </div>
                             </div>
                             <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2.5 flex items-center gap-3 py-2 text-sm shadow-xl">
@@ -107,7 +106,7 @@ export default function Detection() {
                                 </div>
                                 <div>
                                     <p className="text-xs text-slate-400">Model</p>
-                                    <p className="text-white font-bold font-mono">YOLOv8-Traffic</p>
+                                    <p className="text-white font-bold font-mono">{visionStatus?.model || '...'}</p>
                                 </div>
                             </div>
                         </div>

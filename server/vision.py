@@ -14,11 +14,11 @@ except Exception as e:
     print(f"Error loading YOLO model: {e}")
     model = None
 
-# Using a public traffic camera HLS stream (e.g., Georgia DOT)
-STREAM_URL = "https://sfs-msc-pub-lq-07.navigator.dot.ga.gov:443/rtplive/COBB-CCTV-AkersMillRd_OvertonParkDr-1030-E/playlist.m3u8"
+# Using a downloaded highway loop for guaranteed 100% CCTV uptime
+STREAM_URL = "highway.mp4"
 
 async def generate_video_feed():
-    """Reads from public M3U8, runs YOLOv8 inference, yields MJPEG bytes."""
+    """Reads from local highway loop, runs YOLOv8 inference, yields MJPEG bytes."""
     cap = cv2.VideoCapture(STREAM_URL)
     
     if not cap.isOpened():
@@ -32,10 +32,10 @@ async def generate_video_feed():
     try:
         while True:
             ret, frame = cap.read()
+            # Loop the video continuously if we reach the end
             if not ret:
-                # If stream fails, maybe try to reconnect or just break
-                print("End of stream or error reading frame.")
-                break
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
             
             frame_count += 1
             if frame_count % frame_skip != 0:
@@ -65,7 +65,7 @@ async def generate_video_feed():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
             
-            # Small async sleep to prevent blocking the event loop entirely
+            # Small async sleep to match rough FPS and prevent blocking the loop
             await asyncio.sleep(0.01)
 
     finally:
@@ -86,5 +86,5 @@ async def vision_status():
         "status": "active" if model else "error",
         "fps": 30 // 2, # Account for frame skip
         "model": "YOLOv8-Traffic (Nano)",
-        "source": "GA DOT CCTV"
+        "source": "Local CCTV Feed (highway.mp4)"
     }
