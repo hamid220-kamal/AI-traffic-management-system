@@ -1,18 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import { useTrafficData } from '../../../hooks/useTrafficData';
 
 export default function LiveIntersection() {
-    const [activeSignal, setActiveSignal] = useState('N-S Turn');
-
-    useEffect(() => {
-        const signals = ['N-S Turn', 'E-W Straight', 'S-W Turn', 'N-W Straight'];
-        let i = 0;
-        const interval = setInterval(() => {
-            i = (i + 1) % signals.length;
-            setActiveSignal(signals[i]);
-        }, 8000);
-        return () => clearInterval(interval);
-    }, []);
+    const { data } = useTrafficData();
+    const activeSignal = data.phase;
 
     return (
         <div className="w-full flex items-center justify-center p-4">
@@ -46,21 +38,21 @@ export default function LiveIntersection() {
                 <TrafficLight active={activeSignal === 'S-W Turn'} position="bottom-[30%] right-[45%]" />
                 <TrafficLight active={activeSignal === 'N-W Straight'} position="top-[45%] left-[30%]" />
 
-                {/* Vehicles visualization placeholders */}
-                <Car position="top-[20%] left-[38%]" animate={activeSignal === 'N-S Turn'} delay={0} />
-                <Car position="top-[10%] left-[38%]" animate={activeSignal === 'N-S Turn'} delay={0.2} />
+                {/* Vehicles visualization placeholders mapped to actual data queues realistically */}
+                {data.vehicles['N-S Turn'] > 0 && <Car position="top-[20%] left-[38%]" animate={activeSignal === 'N-S Turn'} delay={0} />}
+                {data.vehicles['N-S Turn'] > 5 && <Car position="top-[10%] left-[38%]" animate={activeSignal === 'N-S Turn'} delay={0.2} />}
 
-                <Car position="bottom-[20%] right-[38%]" animate={activeSignal === 'S-W Turn'} delay={0} rotate />
+                {data.vehicles['S-W Turn'] > 0 && <Car position="bottom-[20%] right-[38%]" animate={activeSignal === 'S-W Turn'} delay={0} rotate />}
 
-                <Car position="left-[20%] bottom-[38%]" animate={activeSignal === 'E-W Straight'} delay={0.1} horizontal />
-                <Car position="right-[20%] top-[38%]" animate={activeSignal === 'N-W Straight'} delay={0.3} horizontal rotate />
+                {data.vehicles['E-W Straight'] > 0 && <Car position="left-[20%] bottom-[38%]" animate={activeSignal === 'E-W Straight'} delay={0.1} horizontal />}
+                {data.vehicles['N-W Straight'] > 0 && <Car position="right-[20%] top-[38%]" animate={activeSignal === 'N-W Straight'} delay={0.3} horizontal rotate />}
             </div>
         </div>
     );
 }
 
 const TrafficLight = ({ active, position }) => (
-    <div className={`absolute ${position} w-3 h-3 rounded-full flex items-center justify-center z-20 ${active ? 'bg-emerald-500 text-emerald-900 shadow-[0_0_10px_2px_rgba(16,185,129,0.5)]' : 'bg-red-500/80'}`}>
+    <div className={`absolute ${position} w-3 h-3 rounded-full flex items-center justify-center z-20 transition-colors duration-300 ${active ? 'bg-emerald-500 text-emerald-900 shadow-[0_0_10px_2px_rgba(16,185,129,0.5)]' : 'bg-red-500/80'}`}>
         <div className={`w-1 h-1 rounded-full ${active ? 'bg-white/90' : 'bg-red-900/50'}`} />
     </div>
 );
@@ -78,9 +70,9 @@ const Car = ({ position, animate, delay, horizontal, rotate }) => {
 
     return (
         <motion.div
-            className={`absolute ${position} ${horizontal ? 'w-4 h-2' : 'w-2 h-4'} bg-cyan-400 rounded-sm shadow z-10`}
+            className={`absolute ${position} ${horizontal ? 'w-4 h-2' : 'w-2 h-4'} bg-cyan-400 rounded-sm shadow z-10 transition-opacity`}
             animate={horizontal ? animations.horizontal : animations.vertical}
-            transition={animate ? { duration: 2, ease: "linear", repeat: Infinity, delay } : {}}
+            transition={animate ? { duration: 1.5, ease: "linear", repeat: Infinity, delay } : {}}
             style={rotate ? (horizontal ? { rotate: 180 } : {}) : {}}
         />
     );

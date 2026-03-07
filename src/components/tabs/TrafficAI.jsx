@@ -11,10 +11,11 @@ export default function TrafficAI() {
         }
     ]);
     const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSend = (e) => {
+    const handleSend = async (e) => {
         e?.preventDefault();
-        if (!input.trim()) return;
+        if (!input.trim() || loading) return;
 
         const newMsg = {
             id: Date.now(),
@@ -24,16 +25,33 @@ export default function TrafficAI() {
         };
         setMessages(prev => [...prev, newMsg]);
         setInput('');
+        setLoading(true);
 
-        // Simulate AI response
-        setTimeout(() => {
+        try {
+            const response = await fetch('http://localhost:8000/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: newMsg.text })
+            });
+            const data = await response.json();
+
             setMessages(prev => [...prev, {
                 id: Date.now() + 1,
                 sender: 'ai',
-                text: `I've analyzed your request regarding: "${newMsg.text}".\n\nBased on current real-time data from HITEC_JN_01, the system is dynamically adjusting standard timing by +12% for the E-W corridor to alleviate minor congestion buildup. Confidence score: 92%.`,
+                text: data.response,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             }]);
-        }, 1500);
+        } catch (err) {
+            console.error(err);
+            setMessages(prev => [...prev, {
+                id: Date.now() + 1,
+                sender: 'ai',
+                text: "Error: Could not connect to the Backend API. Please try again.",
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            }]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const quickPrompts = [
@@ -72,6 +90,15 @@ export default function TrafficAI() {
                             </div>
                         </div>
                     ))}
+                    {loading && (
+                        <div className="flex justify-start">
+                            <div className="bg-slate-900 border border-slate-700/50 rounded-xl rounded-bl-sm p-4 text-slate-400 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce"></div>
+                                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <form onSubmit={handleSend} className="card !p-4 flex gap-4 bg-slate-900 border-slate-700/50 shadow-lg">
@@ -79,10 +106,11 @@ export default function TrafficAI() {
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        disabled={loading}
                         placeholder="Ask me anything about traffic management..."
-                        className="flex-1 bg-transparent border-none outline-none text-slate-200 placeholder-slate-500 focus:ring-0"
+                        className="flex-1 bg-transparent border-none outline-none text-slate-200 placeholder-slate-500 focus:ring-0 disabled:opacity-50"
                     />
-                    <button type="submit" className="btn bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center gap-2">
+                    <button type="submit" disabled={loading} className="btn bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center gap-2 disabled:opacity-50">
                         <Send className="w-4 h-4" /> <span className="hidden sm:inline">Send</span>
                     </button>
                 </form>
@@ -97,7 +125,10 @@ export default function TrafficAI() {
                     {quickPrompts.map((prompt, i) => (
                         <button
                             key={i}
-                            onClick={() => setInput(prompt.text)}
+                            type="button"
+                            onClick={() => {
+                                setInput(prompt.text);
+                            }}
                             className="w-full text-left bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors rounded-lg p-4 flex items-start gap-3 group"
                         >
                             <prompt.icon className={`w-5 h-5 mt-0.5 ${prompt.color} flex-shrink-0 group-hover:scale-110 transition-transform`} />
