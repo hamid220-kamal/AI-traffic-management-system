@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hitec-traffic-mgmt.preview.emergentagent.com/sitemap.xml
